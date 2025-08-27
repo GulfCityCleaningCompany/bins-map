@@ -1,42 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Bins Map</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-  <style>
-    html, body, #map { height: 100%; margin: 0; }
-    .custom-tooltip {
-      background: white;
-      padding: 8px 10px;
-      border-radius: 6px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-      font-size: 13px;
-      line-height: 1.4;
-      max-width: 300px;
-      position: relative;
-    }
-    .tt-close {
-      position: absolute;
-      top: 2px;
-      right: 4px;
-      cursor: pointer;
-      font-weight: bold;
-      color: #666;
-    }
-    .tt-close:hover { color: #000; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bins Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+<style>
+  html, body, #map { height: 100%; margin: 0; }
+  .custom-tooltip {
+    background: white;
+    padding: 8px 10px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    font-size: 13px;
+    line-height: 1.4;
+    max-width: 300px;
+    position: relative;
+  }
+  .tt-close {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    color: #666;
+  }
+  .tt-close:hover { color: #000; }
+  /* Fix cluster icon: remove default square */
+  .custom-cluster-icon {
+    border: none !important;
+    box-shadow: none !important;
+    background: none !important;
+    text-align: center;
+    color: white;
+    font-weight: bold;
+    line-height: 30px;
+    font-size: 14px;
+  }
+</style>
 </head>
 <body>
 <div id="map"></div>
 <script>
-// embed CSV here
-const embeddedData = [
+// --- Embedded bins ---
+const embeddedData =[
   {"Latitude":26.1598763975,"Longitude":50.57329478625,"BinID":"3000E2801191A5030066E0CD0E9B","Link":"https://www.google.com/maps?q=26.1598763975,50.57329478625"},
   {"Latitude":26.1598763975,"Longitude":50.57329478625,"BinID":"3000E2801191A50303000E28011","Link":"https://www.google.com/maps?q=26.1598763975,50.57329478625"},
   {"Latitude":26.1598763975,"Longitude":50.57329478625,"BinID":"3000E2801191A5030063000E280","Link":"https://www.google.com/maps?q=26.1598763975,50.57329478625"},
@@ -2346,70 +2358,96 @@ const embeddedData = [
   {"Latitude":26.188181234,"Longitude":50.556044434,"BinID":"3000303A6677C28A2F8DF8476827","Link":"https://www.google.com/maps?q=26.188181234,50.556044434"},
   {"Latitude":26.188181234,"Longitude":50.556044434,"BinID":"3000303A6687C022B9D04C534AA8","Link":"https://www.google.com/maps?q=26.188181234,50.556044434"},
   {"Latitude":26.1881564642858,"Longitude":50.5560429173468,"BinID":"3000303A6687C0466992AAAC5D09","Link":"https://www.google.com/maps?q=26.1881564642858,50.5560429173468"}
-] ;
+];
 
-const map = L.map('map').setView([26.07, 50.55], 12);
-const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
-const googleRoads = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'], attribution: '&copy; Google' });
-const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'], attribution: '&copy; Google' });
+// --- Embedded polygons ---
+const polygons = [
+  {
+    "type":"Polygon",
+    "coordinates":[[[50.513762751477316,26.284159953024307],[50.48833834693074,26.167868525007435],[50.59115352136071,26.092116452233554],[50.69508625203475,26.086847097771734],[50.70709998165567,26.157587186129827],[50.64954583509958,26.19269045957514],[50.62440081961403,26.222519927028625],[50.60735808689601,26.24056429536525],[50.60487522001838,26.246951006205443],[50.60253376101531,26.249838533386544],[50.59121281835363,26.254221432297424],[50.584229091681564,26.263234439337992],[50.513762751477316,26.284159953024307]]]
+  },
+  {
+    "type":"Polygon",
+    "coordinates":[[[50.721115177442336,26.166270741455726],[50.81585682324011,26.222992288184535],[50.637606602353294,26.365265547020716],[50.5093670233765,26.31193353431502],[50.582230887495946,26.278334800114862],[50.57993124026075,26.270161542995485],[50.588042723235795,26.26000040721323],[50.59368731190403,26.25415078927667],[50.602342347861544,26.25073837610391],[50.60343924489858,26.249298702598033],[50.6059407052146,26.246155353451257],[50.62619100854814,26.223542439835303],[50.62790275223869,26.219867992464945],[50.638234348086364,26.213067216553092],[50.66531827676812,26.1847915400568],[50.721115177442336,26.166270741455726]]]
+  }
+];
+
+// --- Base maps ---
+const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' });
+const googleRoads = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { subdomains:['mt0','mt1','mt2','mt3'], attribution: '&copy; Google' });
+const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { subdomains:['mt0','mt1','mt2','mt3'], attribution: '&copy; Google' });
 const dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSM & CARTO', subdomains: 'abcd', maxZoom: 19 });
-L.control.layers({ "OpenStreetMap": osm, "Google Roads": googleRoads, "Google Satellite": googleSat, "Dark": dark }).addTo(map);
-const clusterLayer = L.markerClusterGroup();
-map.addLayer(clusterLayer);
+
+const map = L.map('map', { layers: [osm] }).setView([26.22, 50.58], 12);
+L.control.layers({ "OpenStreetMap": osm, "Google Roads": googleRoads, "Google Hybrid": googleHybrid, "Dark": dark }).addTo(map);
+
 let openTooltip = null;
+
+// Determine marker color
+function getPointColor(lat, lng) {
+  const pt = turf.point([lng, lat]);
+  if (turf.booleanPointInPolygon(pt, polygons[0])) return "green";
+  if (turf.booleanPointInPolygon(pt, polygons[1])) return "blue";
+  return "gray";
+}
+
+// Marker creation
 function rowToMarker(row) {
   const lat = parseFloat(row.latitude ?? row.lat ?? row.Latitude ?? row.Lat);
   const lng = parseFloat(row.longitude ?? row.lng ?? row.Longitude ?? row.Lng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
   const binId = row.BinID ?? row.id ?? '';
   const linkVal = row.Link ?? row.link ?? '';
   const linkHTML = linkVal ? `<a href="${linkVal}" target="_blank" rel="noopener">Open Link</a>` : '(no link)';
   const tooltipHTML = `<div class="custom-tooltip"><div class="tt-close" onclick="closeTooltip()">×</div>Bin ID: ${binId}<br>${linkHTML}</div>`;
-  const marker = L.marker([lat, lng]);
+
+  const color = getPointColor(lat, lng);
+  const marker = L.circleMarker([lat, lng], { radius: 6, color: color, fillColor: color, fillOpacity: 0.9 });
+
   marker.on('click', () => {
     if (openTooltip) { openTooltip.closeTooltip(); openTooltip = null; }
     marker.bindTooltip(tooltipHTML, { permanent: true, direction: 'top', className: 'custom-tooltip', interactive: true }).openTooltip();
     openTooltip = marker;
   });
-  return marker;
-}
-function closeTooltip() { if (openTooltip) { openTooltip.closeTooltip(); openTooltip = null; } }
-const markers = embeddedData.map(rowToMarker).filter(Boolean);
-clusterLayer.addLayers(markers);
-if (markers.length) map.fitBounds(L.latLngBounds(markers.map(m => m.getLatLng())));
-</script>
-</body>
-</html>;
 
-const map = L.map('map').setView([26.07, 50.55], 12);
-const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
-const googleRoads = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'], attribution: '&copy; Google' });
-const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'], attribution: '&copy; Google' });
-const dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSM & CARTO', subdomains: 'abcd', maxZoom: 19 });
-L.control.layers({ "OpenStreetMap": osm, "Google Roads": googleRoads, "Google Satellite": googleSat, "Dark": dark }).addTo(map);
-const clusterLayer = L.markerClusterGroup();
-map.addLayer(clusterLayer);
-let openTooltip = null;
-function rowToMarker(row) {
-  const lat = parseFloat(row.latitude ?? row.lat ?? row.Latitude ?? row.Lat);
-  const lng = parseFloat(row.longitude ?? row.lng ?? row.Longitude ?? row.Lng);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  const binId = row.BinID ?? row.id ?? '';
-  const linkVal = row.Link ?? row.link ?? '';
-  const linkHTML = linkVal ? `<a href="${linkVal}" target="_blank" rel="noopener">Open Link</a>` : '(no link)';
-  const tooltipHTML = `<div class="custom-tooltip"><div class="tt-close" onclick="closeTooltip()">×</div>Bin ID: ${binId}<br>${linkHTML}</div>`;
-  const marker = L.marker([lat, lng]);
-  marker.on('click', () => {
-    if (openTooltip) { openTooltip.closeTooltip(); openTooltip = null; }
-    marker.bindTooltip(tooltipHTML, { permanent: true, direction: 'top', className: 'custom-tooltip', interactive: true }).openTooltip();
-    openTooltip = marker;
-  });
   return marker;
 }
+
 function closeTooltip() { if (openTooltip) { openTooltip.closeTooltip(); openTooltip = null; } }
+
+// Cluster layer with color matching
+const clusterLayer = L.markerClusterGroup({
+  iconCreateFunction: function(cluster) {
+    const markers = cluster.getAllChildMarkers();
+    let greenCount = 0, blueCount = 0;
+    markers.forEach(m => {
+      const color = m.options.fillColor;
+      if(color==='green') greenCount++;
+      if(color==='blue') blueCount++;
+    });
+    let clusterColor = 'gray';
+    if(greenCount >= blueCount && greenCount>0) clusterColor='green';
+    else if(blueCount > greenCount) clusterColor='blue';
+
+    return L.divIcon({
+      html: `<div style="background-color:${clusterColor}; border-radius:50%; width:30px; height:30px; display:flex; align-items:center; justify-content:center;">${cluster.getChildCount()}</div>`,
+      className: 'custom-cluster-icon',
+      iconSize: [30,30]
+    });
+  }
+});
+map.addLayer(clusterLayer);
+
+// Add markers
 const markers = embeddedData.map(rowToMarker).filter(Boolean);
 clusterLayer.addLayers(markers);
-if (markers.length) map.fitBounds(L.latLngBounds(markers.map(m => m.getLatLng())));
+if(markers.length) map.fitBounds(L.latLngBounds(markers.map(m => m.getLatLng())));
+
+// Invisible polygons (for Turf checks)
+polygons.forEach((f) => {
+  L.geoJSON(f, { opacity: 0, fillOpacity: 0 }).addTo(map);
+});
 </script>
 </body>
 </html>
