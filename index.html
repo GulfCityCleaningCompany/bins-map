@@ -2642,7 +2642,7 @@ const polygons = [
   }
 ];
 
-// --- VIP Road polygons ---
+// --- VIP Road polygons (initially not added to map) ---
 const manamaGeoJSON = { "type": "FeatureCollection", "features": [ {
   "type": "FeatureCollection",
   "features": [
@@ -7675,7 +7675,7 @@ const manamaGeoJSON = { "type": "FeatureCollection", "features": [ {
     }
   ]
 } ] };
-const muharraqGeoJSON = { "type": "FeatureCollection", "features": [ {
+const muharraqGeoJSON = { "type": "FeatureCollection", "features": [{
   "type": "FeatureCollection",
   "features": [
     {
@@ -11204,7 +11204,7 @@ const muharraqGeoJSON = { "type": "FeatureCollection", "features": [ {
       "properties": {}
     }
   ]
-} ] };
+}] };
 
 // --- Base maps ---
 const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' });
@@ -11214,10 +11214,11 @@ const dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}
 
 const map = L.map('map', { layers: [osm] }).setView([26.22, 50.58], 12);
 
-// --- Layer control with only VIP layers ---
-const manamaLayer = L.geoJSON(manamaGeoJSON, { style: { color: "green", weight: 2, fillOpacity: 0.3 } }).addTo(map);
-const muharraqLayer = L.geoJSON(muharraqGeoJSON, { style: { color: "blue", weight: 2, fillOpacity: 0.3 } }).addTo(map);
+// --- VIP layers (not added by default) ---
+const manamaLayer = L.geoJSON(manamaGeoJSON, { style: { color: "green", weight: 2, fillOpacity: 0.3 } });
+const muharraqLayer = L.geoJSON(muharraqGeoJSON, { style: { color: "blue", weight: 2, fillOpacity: 0.3 } });
 
+// --- Layer control ---
 L.control.layers(
   { "OpenStreetMap": osm, "Google Roads": googleRoads, "Google Hybrid": googleHybrid, "Dark": dark },
   { "Manama VIP Roads": manamaLayer, "Muharraq VIP Roads": muharraqLayer }
@@ -11234,32 +11235,65 @@ function getPointColor(lat, lng) {
 
 // --- Add markers with clustering ---
 function rowToMarker(row) {
-  const lat = parseFloat(row.Latitude), lng = parseFloat(row.Longitude);
+  const lat = parseFloat(row.Latitude);
+  const lng = parseFloat(row.Longitude);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  const tooltipHTML = `<div class="custom-tooltip"><div class="tt-close" onclick="closeTooltip()">×</div>Bin ID: ${row.BinID}<br><a href="${row.Link}" target="_blank" rel="noopener">Open Link</a></div>`;
+
   const color = getPointColor(lat, lng);
-  const marker = L.circleMarker([lat, lng], { radius: 6, color, fillColor: color, fillOpacity: 0.9 });
-  marker.on('click', () => { if (openTooltip) { openTooltip.closeTooltip(); openTooltip=null; } marker.bindTooltip(tooltipHTML, { permanent:true, direction:'top', className:'custom-tooltip', interactive:true }).openTooltip(); openTooltip=marker; });
+  const tooltipHTML = `
+    <div class="custom-tooltip">
+      <div class="tt-close" onclick="closeTooltip()">×</div>
+      Bin ID: ${row.BinID}<br>
+      <a href="${row.Link}" target="_blank" rel="noopener">Open Link</a>
+    </div>
+  `;
+  const marker = L.circleMarker([lat, lng], { 
+    radius: 6, 
+    color: color, 
+    fillColor: color, 
+    fillOpacity: 0.9 
+  });
+
+  marker.on('click', () => {
+    if (openTooltip) { openTooltip.closeTooltip(); openTooltip = null; }
+    marker.bindTooltip(tooltipHTML, { permanent: true, direction: 'top', className: 'custom-tooltip', interactive: true }).openTooltip();
+    openTooltip = marker;
+  });
+
   return marker;
 }
-function closeTooltip() { if(openTooltip){openTooltip.closeTooltip(); openTooltip=null;} }
+
+function closeTooltip() { 
+  if(openTooltip){ 
+    openTooltip.closeTooltip(); 
+    openTooltip = null; 
+  } 
+}
 
 const clusterLayer = L.markerClusterGroup({
   iconCreateFunction: function(cluster) {
     const markers = cluster.getAllChildMarkers();
-    let greenCount=0, blueCount=0;
-    markers.forEach(m => { if(m.options.fillColor==='green') greenCount++; if(m.options.fillColor==='blue') blueCount++; });
-    let clusterColor = greenCount>=blueCount && greenCount>0 ? 'green' : (blueCount>greenCount ? 'blue' : 'gray');
-    return L.divIcon({ html:`<div style="background-color:${clusterColor}; border-radius:50%; width:30px; height:30px; display:flex; align-items:center; justify-content:center;">${cluster.getChildCount()}</div>`, className:'custom-cluster-icon', iconSize:[30,30] });
+    let greenCount = 0, blueCount = 0;
+    markers.forEach(m => { 
+      if(m.options.fillColor === 'green') greenCount++; 
+      if(m.options.fillColor === 'blue') blueCount++; 
+    });
+    let clusterColor = greenCount >= blueCount && greenCount > 0 ? 'green' : (blueCount > greenCount ? 'blue' : 'gray');
+    return L.divIcon({ 
+      html: `<div style="background-color:${clusterColor}; border-radius:50%; width:30px; height:30px; display:flex; align-items:center; justify-content:center;">${cluster.getChildCount()}</div>`, 
+      className:'custom-cluster-icon', 
+      iconSize:[30,30] 
+    });
   }
 });
-map.addLayer(clusterLayer);
 
+map.addLayer(clusterLayer);
 const markers = embeddedData.map(rowToMarker).filter(Boolean);
 clusterLayer.addLayers(markers);
-if(markers.length) map.fitBounds(L.latLngBounds(markers.map(m=>m.getLatLng())));
 
-// --- Invisible polygons for Turf ---
+if(markers.length) map.fitBounds(L.latLngBounds(markers.map(m => m.getLatLng())));
+
+// --- Invisible polygons for Turf checks ---
 polygons.forEach(f => L.geoJSON(f, { opacity:0, fillOpacity:0 }).addTo(map));
 
 </script>
